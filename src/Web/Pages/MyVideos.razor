@@ -1,0 +1,78 @@
+﻿@page "/myvideos"
+@using Microsoft.AspNetCore.Authorization
+@using Model
+@using Shared.Model.Entities
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Your videos</PageTitle>
+
+<h1>Your videos</h1>
+
+<a href="uploadvideo" class="btn btn-primary" role="button">Add video</a>
+@if (Videos == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="container text-center">
+        <div class="row align-items-start">
+            @foreach (var video in Videos)
+            {
+                <div class="col-md-6">
+                    <div class="card" style="width: 18rem;">
+                        <img src="https://avatars.mds.yandex.net/i?id=759f0fe35056b1ae0ad447d6800334a1_l-5277860-images-thumbs&n=13" class="card-img-top" alt="...">
+                        <div class="card-body">
+                            <h5 class="card-title">@video.Title</h5>
+                            <p class="card-text">@video.Description</p>
+                            <button @onclick="@(_ => GetLink(video.Path))" class="btn btn-primary">Go</button>
+                            <button @onclick="@(_ => DeleteVideo(video.Id))" class="btn btn-danger">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<VideoItem>? Videos;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Videos = await Http.GetFromJsonAsync<List<VideoItem>>($"api/video/getuservideos");
+    }
+
+    private async Task GetLink(string videoPath)
+    {
+        var response = await Http.PostAsJsonAsync("api/video/getlink", videoPath);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var link = await response.Content.ReadAsStringAsync();
+            link = link.Replace("https://", "http://");
+            Navigation.NavigateTo(link);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", $"Ошибка: {response.StatusCode}");
+        }
+    }
+
+    private async Task DeleteVideo(string id)
+    {
+        var response = await Http.DeleteAsync($"api/video/delete/{id}");
+
+        if (response.IsSuccessStatusCode)
+        {
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", $"Ошибка: {response.StatusCode}");
+        }
+    }
+}

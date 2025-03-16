@@ -1,0 +1,161 @@
+version: "3.8"
+
+services:
+    
+  keycloak:
+    container_name: keycloak
+    image: quay.io/keycloak/keycloak:26.1.0
+    command:
+      - start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KEYCLOAK_IMPORT: /opt/keycloak/data/import/realm-export.json
+    ports:
+      - 8080:8080
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
+    networks:
+      - mytube
+
+  
+  gateway:
+    container_name: gateway  
+    image: gateway
+    build:
+      context: ./src
+      dockerfile: ApiGateway/Dockerfile
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:5000;https://+:5001
+      - ASPNETCORE_HTTP_PORT=5000
+      - ASPNETCORE_HTTPS_PORT=5001
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=password
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+    volumes:
+    - ./https:/https:ro
+    depends_on:
+      - videoservice
+      - keycloak
+      - notificationservice
+    networks:
+      - mytube
+
+  
+  videoservice:
+    container_name: videoservice
+    image: videoservice
+    build:
+      context: ./src
+      dockerfile: VideoService/Dockerfile
+    ports:
+      - "5100:5100"
+      - "5101:5101"
+    volumes:
+      - ./https:/https:ro
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:5100;https://+:5101
+      - ASPNETCORE_HTTP_PORT=5100
+      - ASPNETCORE_HTTPS_PORT=5101
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=password
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+    depends_on:
+      - minio
+      - postgres
+      - kafka
+    networks:
+      - mytube
+
+
+  notificationservice:
+    container_name: notificationservice
+    image: notificationservice
+    build:
+      context: ./src
+      dockerfile: NotificationService/Dockerfile
+    ports:
+      - "5300:5300"
+      - "5301:5301"
+    volumes:
+      - ./https:/https:ro
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:5300;https://+:5301
+      - ASPNETCORE_HTTP_PORT=5300
+      - ASPNETCORE_HTTPS_PORT=5301
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=password
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+    depends_on:
+      - kafka
+    networks:
+      - mytube
+
+
+  minio:
+    container_name: minio
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=adminpassword
+    command: server /data --console-address ":9090"
+    volumes:
+      - minio_data:/data
+    networks:
+      - mytube
+
+  zookeeper:
+    container_name: zookeeper
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+    networks:
+      - mytube
+
+  kafka:
+    container_name: kafka  
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    networks:
+      - mytube
+
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 8744
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mytube
+
+volumes:
+  keycloak_data:
+  minio_data:
+  postgres_data:
+
+networks:
+  mytube:
+    driver: bridge

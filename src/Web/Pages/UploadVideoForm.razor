@@ -1,0 +1,68 @@
+﻿@page "/uploadvideo"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+
+<EditForm Model="@video" OnSubmit="Submit">
+    <div class="mb-3">
+        <label for="Title" class="form-label">Title</label>
+        <InputText class="form-control" id="Title" @bind-Value="video.Title" />
+    </div>
+    <div class="mb-3">
+        <label for="Description" class="form-label">Description</label>
+        <InputText class="form-control" id="Description" @bind-Value="video.Description" />
+    </div>
+    <div class="mb-3">
+        <label for="formFile" class="form-label">Upload File</label>
+        <InputFile class="form-control" id="formFile" OnChange="HandleFileUpload" accept=".mp4,video/mp4" />
+    </div>
+    <button type="submit" class="btn btn-primary mb-3">Upload</button>
+</EditForm>
+
+@code {
+    private Model.Entities.VideoUploadRequest video;
+
+    protected override async Task OnInitializedAsync()
+    {
+        video = new();
+    }
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        video.File = e.File;
+
+        const long maxFileSize = 450 * 1024 * 1024;
+
+        if (video.File.Size > maxFileSize)
+        {
+            Console.WriteLine("File size exceeds the limit of 450 MB.");
+            video.File = null; // Сбрасываем файл
+        }
+    }
+
+    public async Task Submit()
+    {
+        if (video.File == null)
+        {
+            Console.WriteLine("No file selected.");
+            return;
+        }
+
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(video.Title), "title");
+        content.Add(new StringContent(video.Description), "description");
+        content.Add(new StreamContent(video.File.OpenReadStream(524288000)), "file", video.File.Name);
+
+        var response = await Http.PostAsync("http://localhost:5000/api/video/upload", content);
+        if (response.IsSuccessStatusCode)
+        {
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            Console.WriteLine("Upload failed.");
+        }
+    }
+}
