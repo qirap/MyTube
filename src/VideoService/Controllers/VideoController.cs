@@ -97,9 +97,16 @@ namespace VideoService.Controllers
 
 		[ProducesResponseType(StatusCodes.Status200OK)]
 		[HttpPost("getlink")]
-		public async Task<IActionResult> GetLink([FromBody] string videoPath)
+		public async Task<IActionResult> GetLink([FromBody] string videoId)
 		{
-			var link = await s3Provider.GeneratePresignedUrlAsync("mytube", videoPath);
+			var videoInfo = videoContext.Videos.FirstOrDefault(v => v.Id == videoId);
+			if (videoInfo == null)
+			{
+				return NotFound();
+			}
+
+			var link = await s3Provider.GeneratePresignedUrlAsync("mytube", videoInfo.Path);
+			link = link.Replace("https://minio", "http://localhost");
 
 			return Ok(link);
 		}

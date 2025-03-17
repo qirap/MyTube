@@ -1,0 +1,29 @@
+﻿@page "/video/{VideoPath}"
+@using Shared.Model.Entities
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<h3>VideoPage</h3>
+
+<video class="video" type="video/mp4" src="@Link" muted="muted" autoplay="autoplay" loop width="640" height="480" controls></video>
+
+@code {
+    [Parameter]
+    public string? VideoPath { get; set; }
+    //public VideoItem VideoItem { get; set; } = null!;
+    public string? Link { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var response = await Http.PostAsJsonAsync("api/video/getlink", VideoPath);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Link = await response.Content.ReadAsStringAsync();
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", $"Ошибка: {response.StatusCode}");
+        }
+    }
+}

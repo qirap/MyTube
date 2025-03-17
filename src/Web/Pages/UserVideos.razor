@@ -1,4 +1,4 @@
-﻿@page "/myvideos"
+﻿@page "/uservideos"
 @using Microsoft.AspNetCore.Authorization
 @using Model
 @using Shared.Model.Entities
@@ -28,7 +28,7 @@ else
                         <div class="card-body">
                             <h5 class="card-title">@video.Title</h5>
                             <p class="card-text">@video.Description</p>
-                            <button @onclick="@(_ => GetLink(video.Path))" class="btn btn-primary">Go</button>
+                            <a href="@($"video/{video.Id}")" class="btn btn-primary">Go</a>
                             <button @onclick="@(_ => DeleteVideo(video.Id))" class="btn btn-danger">Delete</button>
                         </div>
                     </div>
@@ -44,22 +44,6 @@ else
     protected override async Task OnInitializedAsync()
     {
         Videos = await Http.GetFromJsonAsync<List<VideoItem>>($"api/video/getuservideos");
-    }
-
-    private async Task GetLink(string videoPath)
-    {
-        var response = await Http.PostAsJsonAsync("api/video/getlink", videoPath);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var link = await response.Content.ReadAsStringAsync();
-            link = link.Replace("https://", "http://");
-            Navigation.NavigateTo(link);
-        }
-        else
-        {
-            await JS.InvokeVoidAsync("alert", $"Ошибка: {response.StatusCode}");
-        }
     }
 
     private async Task DeleteVideo(string id)
