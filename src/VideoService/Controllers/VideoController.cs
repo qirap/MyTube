@@ -55,7 +55,7 @@ namespace VideoService.Controllers
 				stream,
 				"video/mp4");
 
-			var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier).ToString();
+			var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
 			var videoItem = new VideoItem
 			{
 				UserId = userId,
@@ -106,7 +106,8 @@ namespace VideoService.Controllers
 			}
 
 			var link = await s3Provider.GeneratePresignedUrlAsync("mytube", videoInfo.Path);
-			link = link.Replace("https://minio", "http://localhost");
+			link = link.Replace("https://", "http://");
+			link = link.Replace("minio", "localhost");
 
 			return Ok(link);
 		}

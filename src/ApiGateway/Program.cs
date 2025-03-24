@@ -30,9 +30,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 		options.TokenValidationParameters = new TokenValidationParameters
 		{
 			ValidateIssuer = true,
-			ValidIssuer = jwtSettings["Authority"],
 			ValidateAudience = true,
-			ValidAudience = jwtSettings["Audience"],
 			ValidateLifetime = true,
 			ValidateIssuerSigningKey = true
 		};
@@ -52,24 +50,27 @@ builder.Services.AddReverseProxy()
 				transformContext.ProxyRequest.Headers.Add("X-User-Id", user.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 				transformContext.ProxyRequest.Headers.Add("X-User-Name", user.FindFirst("preferred_username")?.Value);
 
-				var realmAccessClaim = user.Claims.FirstOrDefault(c => c.Type == "resource_access")?.Value;
-				List<string> roles = new();
+				var roles = new List<string>();
+				var resourceAccessClaim = user.FindFirst("resource_access")?.Value;
 
-				if (!string.IsNullOrEmpty(realmAccessClaim))
+				if (!string.IsNullOrEmpty(resourceAccessClaim))
 				{
 					try
 					{
-						using var doc = JsonDocument.Parse(realmAccessClaim);
-						if (doc.RootElement.TryGetProperty("gateway", out var gatewayElement)
-							&& gatewayElement.TryGetProperty("roles", out var rolesElement)
-							&& rolesElement.ValueKind == JsonValueKind.Array)
+						using var doc = JsonDocument.Parse(resourceAccessClaim);
+						if (doc.RootElement.TryGetProperty("gateway", out var gatewayElement) &&
+							gatewayElement.TryGetProperty("roles", out var rolesElement) &&
+							rolesElement.ValueKind == JsonValueKind.Array)
 						{
-							roles = rolesElement.EnumerateArray().Select(r => r.GetString()).Where(r => r != null).ToList();
+							roles = rolesElement.EnumerateArray()
+											   .Select(r => r.GetString())
+											   .Where(r => !string.IsNullOrEmpty(r))
+											   .ToList()!;
 						}
 					}
 					catch (JsonException ex)
 					{
-						Console.WriteLine($"Ошибка парсинга ролей: {ex.Message}");
+						Console.Error.WriteLine($"Ошибка парсинга ролей: {ex}");
 					}
 				}
 
